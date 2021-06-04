@@ -13,7 +13,7 @@ from dotenv import dotenv_values
 
 app = Flask(__name__)
 config = dotenv_values(".env")
-app.config['SECRET_KEY'] = config["flask_apikey"]
+app.config['SECRET_KEY'] = 'my_secret_key'
 ckeditor = CKEditor(app)
 Bootstrap(app)
 
