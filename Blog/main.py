@@ -22,7 +22,7 @@ import smtplib
 # flask_apikey = config['flask_apikey']
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get("flask_apikey", flask_apikey)     # online then offline secrets.
+app.config['SECRET_KEY'] = os.environ.get("flask_apikey")     # online then offline secrets.
 ckeditor = CKEditor(app)
 Bootstrap(app)
 
