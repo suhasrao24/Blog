@@ -1,8 +1,5 @@
-{% extends 'bootstrap/base.html' %}
 {% import "bootstrap/wtf.html" as wtf %}
 
-
-{% block content %}
 {% include "header.html" %}
 
 <!-- Page Header -->
@@ -12,11 +9,11 @@
         <div class="row">
             <div class="col-lg-8 col-md-10 mx-auto">
                 <div class="post-heading">
-                    <h1>{{post.title}}</h1>
-                    <h2 class="subheading">{{post.subtitle}}</h2>
+                    <h1>{{ post.title }}</h1>
+                    <h2 class="subheading">{{ post.subtitle }}</h2>
                     <span class="meta">Posted by
-              <a href="#">{{post.author.name}}</a>
-              on {{post.date}}</span>
+              <a href="#">{{ post.author.name }}</a>
+              on {{ post.date }}</span>
                 </div>
             </div>
         </div>
@@ -31,7 +28,7 @@
                 {{ post.body|safe }}
                 <hr>
 
-                {% if current_user.id == 1 %}
+                {% if post.author_id == current_user.id %}
                 <div class="clearfix">
                     <a class="btn btn-primary float-right" href="{{url_for('edit_post', post_id=post.id)}}">Edit
                         Post</a>
@@ -40,14 +37,15 @@
 
 
                 <!--           Comments Area -->
+                <div style="font-weight:bold">
                 {{ ckeditor.load() }}
                 {{ ckeditor.config(name='comment') }}
                 {{ wtf.quick_form(form, novalidate=True, button_map={"submit": "primary"}) }}
-
+                </div>
 
                 {% if comments is not none %}
                     {% for comment in comments %}
-                <div class="col-lg-8 col-md-10 mx-auto comment">
+                <div class="col-lg-8 col-md-10 comment">
                     <ul class="commentList">
                         <li>
                             <div class="commenterImage">
@@ -57,7 +55,7 @@
                                 {{ comment.text|safe }}
                                 <span class="date sub-text">{{ comment.comment_author.name|safe }}</span><br>
                                 {% if comment.comment_author.id == current_user.id or current_user.id == 1  %}
-                                    <a class="text-end" href="{{ url_for('delete_comment', comment_id=comment.id) }}" style="font-size:1.35rem">Delete comment</a>
+                                    <a class="text-end" href="{{ url_for('delete_comment', comment_id=comment.id) }}" style="font-size:0.75rem">Delete comment</a>
                                 {% endif %}
                             </div>
                         </li>
@@ -71,5 +69,5 @@
 </article>
 
 <hr>
+
 {% include "footer.html" %}
-{% endblock %}

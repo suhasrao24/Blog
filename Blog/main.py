@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, flash, abort
+from flask import Flask, render_template, redirect, url_for, flash, abort, request
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
 from datetime import date
@@ -11,15 +11,23 @@ from flask_gravatar import Gravatar
 from functools import wraps
 from dotenv import dotenv_values
 import os
+import smtplib
+
+
+config = dotenv_values(".env")          # for offline secrets
+
+from_email = config['from_email']
+to_email = config['to_email']
+password = config['password']
+flask_apikey = config['flask_apikey']
 
 app = Flask(__name__)
-config = dotenv_values(".env")
-app.config['SECRET_KEY'] = os.environ.get("flask_apikey")
+app.config['SECRET_KEY'] = os.environ.get("flask_apikey", flask_apikey)     # online then offline secrets.
 ckeditor = CKEditor(app)
 Bootstrap(app)
 
 # CONNECT TO DB
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL",  "sqlite:///blog.db")
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL",  "sqlite:///blog.db")    # online then offline secrets.
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -48,7 +56,6 @@ def admin_only(f):
 
 
 # CONFIGURE TABLES
-
 
 class User(UserMixin, db.Model):
     __tablename__ = "users"
@@ -135,13 +142,6 @@ def login():
     return render_template("login.html", form=form)
 
 
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('get_all_posts'))
-
-
 @app.route("/post/<int:post_id>", methods=['GET', 'POST'])
 def show_post(post_id):
     form = CommentForm()
@@ -158,28 +158,15 @@ def show_post(post_id):
             db.session.add(comment_data)
             db.session.commit()
             return redirect(url_for('show_post', post_id=post_id))
+    blogpost_comments = Comment.query.filter_by(blogpost_id=post_id).all()
     requested_post = BlogPost.query.get(post_id)
-    blogpost_comments = None
-    try:
-        blogpost_comments = Comment.query.filter_by(blogpost_id=post_id).all()
-    except AttributeError:
-        pass
-    finally:
-        return render_template("post.html", post=requested_post, comments=blogpost_comments, form=form)
-
-
-@app.route("/about")
-def about():
-    return render_template("about.html")
-
-
-@app.route("/contact")
-def contact():
-    return render_template("contact.html")
+    if requested_post is None:                          # no post at that post-id.
+        return abort(404)
+    return render_template("post.html", post=requested_post, comments=blogpost_comments, form=form)
 
 
 @app.route("/new-post", methods=['GET', 'POST'])
-@admin_only
+@login_required
 def add_new_post():
     form = CreatePostForm()
     if form.validate_on_submit():
@@ -198,8 +185,13 @@ def add_new_post():
 
 
 @app.route("/edit-post/<int:post_id>", methods=['GET', 'POST'])
-@admin_only
+@login_required
 def edit_post(post_id):
+    try:
+        if current_user.id != BlogPost.query.get(int(post_id)).author_id:
+            return abort(403)
+    except AttributeError:                  # no post at that post-id.
+        return abort(404)
     post = BlogPost.query.get(post_id)
     edit_form = CreatePostForm(
         title=post.title,
@@ -215,12 +207,17 @@ def edit_post(post_id):
         post.body = edit_form.body.data
         db.session.commit()
         return redirect(url_for("show_post", post_id=post.id))
-    return render_template("make-post.html", form=edit_form)
+    return render_template("make-post.html", form=edit_form, is_edit=True)
 
 
-@app.route("/delete/<int:post_id>")
-@admin_only
+@app.route("/delete-post/<int:post_id>")
+@login_required
 def delete_post(post_id):
+    try:
+        if current_user.id != BlogPost.query.get(int(post_id)).author_id and current_user.id != 1:
+            return abort(403)
+    except AttributeError:                  # no post at that post-id.
+        return abort(404)
     post_to_delete = BlogPost.query.get(post_id)
     db.session.delete(post_to_delete)
     db.session.commit()
@@ -228,12 +225,50 @@ def delete_post(post_id):
 
 
 @app.route("/delete-comment/<int:comment_id>")
+@login_required
 def delete_comment(comment_id):
+    try:
+        if current_user.id != Comment.query.get(int(comment_id)).author_id and current_user.id != 1:
+            return abort(403)
+    except AttributeError:                  # no comment at that comment-id.
+        return abort(404)
     comment_to_delete = Comment.query.filter_by(id=comment_id).first()
     post_to_return = BlogPost.query.filter_by(id=int(comment_to_delete.blogpost_id)).first()
     db.session.delete(comment_to_delete)
     db.session.commit()
     return redirect(url_for('show_post', post_id=post_to_return.id))
+
+
+@app.route("/about")
+def about():
+    return render_template("about.html")
+
+
+@app.route('/contact', methods=['GET', 'POST'])
+def contact():
+    if request.method == 'POST':
+        data = request.form
+        send_email(data["name"], data["email"], data["phone"], data["message"])
+        statement = 'Succesfully sent your message'
+        return render_template('contact.html', feedback=statement)
+    return render_template('contact.html')
+
+
+def send_email(name, email, phone, message):
+    email_message = f"Name: {name}\nEmail: {email}\nPhone: {phone}\nMessage:{message}"
+    with smtplib.SMTP("smtp.gmail.com") as connection:
+        connection.starttls()
+        connection.login(user=from_email, password=password)
+        connection.sendmail(from_addr=from_email,
+                            to_addrs=to_email,
+                            msg=f"Subject:Message from your blog!!\n\n{email_message}")
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('get_all_posts'))
 
 
 if __name__ == "__main__":
