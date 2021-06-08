@@ -9,17 +9,17 @@ from flask_login import UserMixin, login_user, LoginManager, login_required, cur
 from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
 from flask_gravatar import Gravatar
 from functools import wraps
-from dotenv import dotenv_values
+# from dotenv import dotenv_values
 import os
 import smtplib
 
 
-config = dotenv_values(".env")          # for offline secrets
+# config = dotenv_values(".env")          # for offline secrets
 
-from_email = config['from_email']
-to_email = config['to_email']
-password = config['password']
-flask_apikey = config['flask_apikey']
+# from_email = config['from_email']
+# to_email = config['to_email']
+# password = config['password']
+# flask_apikey = config['flask_apikey']
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get("flask_apikey", flask_apikey)     # online then offline secrets.
